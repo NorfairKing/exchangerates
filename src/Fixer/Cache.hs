@@ -1,16 +1,21 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Fixer.Cache
     ( FixerCache(..)
     , emptyFixerCache
     , insertRatesInCache
     , lookupRatesInCache
+    -- Defaults
+    , defaultBaseCurrency
+    , allSymbols
     -- Helpers
     , convertToBaseWithRate
     , rawInsertInCache
     , rawLookupInCache
     ) where
 
+import Data.Aeson
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Map (Map)
@@ -22,7 +27,7 @@ import Fixer.Types
 
 newtype FixerCache = FixerCache
     { unFixerCache :: Map Day (Map Currency (Map Currency Rate))
-    } deriving (Show, Eq, Generic)
+    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 instance Validity FixerCache
 
@@ -47,6 +52,9 @@ rawLookupInCache d from to (FixerCache fc) =
 
 defaultBaseCurrency :: Currency
 defaultBaseCurrency = EUR
+
+allSymbols :: Symbols
+allSymbols = Symbols $ NE.fromList [minBound .. maxBound]
 
 insertRatesInCache :: Rates -> FixerCache -> FixerCache
 insertRatesInCache rs fc =

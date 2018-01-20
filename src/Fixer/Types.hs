@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -9,11 +8,14 @@ module Fixer.Types
     , mulRate
     , divRate
     , normaliseRate
+    , rateToRational
+    , rateToDouble
     , Currency(..)
     , Symbols(..)
     , Rates(..)
     ) where
 
+import Control.Applicative
 import Data.Aeson as JSON
 import Data.Aeson.Types as JSON
 import qualified Data.List.NonEmpty as NE
@@ -29,14 +31,15 @@ import Data.Validity
 import Data.Validity.Containers ()
 import Data.Validity.Time ()
 import GHC.Generics (Generic)
-import Numeric.Natural
+import GHC.Natural
+import GHC.Real (Ratio(..))
 import Servant.API
 import Text.Read
 
 -- A positive and non-0 ratio
 newtype Rate = Rate
     { unRate :: Ratio Natural
-    } deriving (Show, Eq, Generic, FromJSON, ToJSON)
+    } deriving (Show, Eq, Generic)
 
 oneRate :: Rate
 oneRate = Rate 1
@@ -50,6 +53,12 @@ divRate (Rate r1) (Rate r2) = normaliseRate $ Rate (r1 / r2)
 normaliseRate :: Rate -> Rate
 normaliseRate = Rate . fromRational . toRational . unRate
 
+rateToRational :: Rate -> Rational
+rateToRational (Rate (num :% den)) = fromIntegral num :% fromIntegral den
+
+rateToDouble :: Rate -> Double
+rateToDouble = fromRational . rateToRational
+
 instance Validity Rate where
     validate r@Rate {..} =
         mconcat
@@ -58,6 +67,22 @@ instance Validity Rate where
             , (normaliseRate r == r) <?@> "is normalised"
             ]
     isValid = isValidByValidating
+
+instance FromJSON Rate where
+    parseJSON v =
+        (Rate <$> parseJSON v) <|>
+        -- First try to parse as a ratio
+        (do d <- parseJSON v :: JSON.Parser Double
+            -- The api has a precision of 0.0001.
+            let r@(num :% den) = toRational d
+            if r == 0
+                then fail "Failed to parse zero rate"
+                else pure $
+                     normaliseRate $
+                     Rate $ naturalFromInteger num % naturalFromInteger den)
+
+instance ToJSON Rate where
+    toJSON = toJSON . unRate
 
 data Currency
     = AUD

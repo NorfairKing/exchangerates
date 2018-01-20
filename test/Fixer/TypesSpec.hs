@@ -16,7 +16,7 @@ spec :: Spec
 spec = do
     eqSpec @Rate
     genValidSpec @Rate
-    -- jsonSpecOnValid @Rate
+    jsonSpecOnValid @Rate
     describe "Rate" $ do
         describe "oneRate" $ it "is a valid rate" $ shouldBeValid oneRate
         specify "0 % x is an invalid rate" $
