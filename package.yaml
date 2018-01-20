@@ -1,0 +1,46 @@
+name:                fixer
+version:             0.0.0.0
+github:              "NorfairKing/fixer"
+license:             BSD3
+author:              "Tom Sydney Kerckhove"
+maintainer:          "syd.kerckhove@gmail.com"
+copyright:           "Copyright: (c) 2018 Tom Sydney Kerckhove"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+synopsis:            A Haskell client for http://fixer.io/
+category:            API
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/NorfairKing/fixer#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- aeson
+- http-api-data
+- http-client
+- servant
+- servant-client
+- text
+- time
+- containers
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Fixer
+
+executables:
+  fixer:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - fixer
