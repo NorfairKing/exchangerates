@@ -19,16 +19,20 @@ category:            API
 description:         Please see the README on Github at <https://github.com/NorfairKing/fixer#readme>
 
 dependencies:
-- base >= 4.7 && < 5
 - aeson
+- base >= 4.7 && < 5
+- containers
 - http-api-data
 - http-client
+- mtl
 - servant
 - servant-client
 - text
 - time
-- containers
-- mtl
+- validity
+- validity-containers
+- validity-time
+- yaml
 
 library:
   source-dirs: src
@@ -37,6 +41,7 @@ library:
     - Fixer.Types
     - Fixer.API
     - Fixer.Client
+    - Fixer.Cache
 
 executables:
   fixer:
@@ -48,3 +53,25 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - fixer
+
+tests:
+  fixer-test:
+    main: Spec.hs
+    source-dirs: test/
+    default-extensions:
+    - NoImplicitPrelude
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wall
+    dependencies:
+    - QuickCheck
+    - base >=4.9 && <=5
+    - fixer
+    - genvalidity-containers
+    - genvalidity-hspec
+    - genvalidity-hspec-aeson
+    - genvalidity-text
+    - genvalidity-time
+    - hspec
