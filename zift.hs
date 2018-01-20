@@ -17,7 +17,6 @@ import Zifter.Stack
 main :: IO ()
 main =
     ziftWith $ do
-        recursiveZift
         preprocessor hindentZift
         prechecker gitAddAllZift
         checker $ do

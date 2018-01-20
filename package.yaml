@@ -33,6 +33,7 @@ library:
   source-dirs: src
   exposed-modules:
     - Fixer
+    - Fixer.Types
 
 executables:
   fixer:
