@@ -29,7 +29,7 @@ dependencies:
 - servant-client
 - text
 - time
-- validity
+- validity >=0.4.0.3
 - validity-containers
 - validity-time
 - yaml
@@ -69,6 +69,7 @@ tests:
     - QuickCheck
     - base >=4.9 && <=5
     - fixer
+    - genvalidity >=0.4.0.4
     - genvalidity-containers
     - genvalidity-hspec
     - genvalidity-hspec-aeson

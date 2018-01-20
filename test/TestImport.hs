@@ -5,6 +5,10 @@ module TestImport
 import Debug.Trace as X
 import Prelude as X hiding (head, init, last, tail)
 
+import Data.Maybe as X
+
+import Control.Monad as X
+
 import Test.Hspec as X
 import Test.QuickCheck as X
 import Test.Validity as X
