@@ -30,8 +30,7 @@ fixer = do
     res <- runClientM (getLatest Nothing Nothing) (ClientEnv man burl)
     case res of
         Left err -> die $ show err
-        Right v -> do
-            print v
+        Right v -> print v
 
 fixerAPI :: Proxy FixerAPI
 fixerAPI = Proxy
