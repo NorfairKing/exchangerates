@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
-
 module Fixer
     ( fixer
     ) where
@@ -23,28 +19,12 @@ import System.Exit
 import Text.Read
 import Web.HttpApiData
 
+import Fixer.Client
 import Fixer.Types
 
 fixer :: IO ()
 fixer = do
-    man <- newManager defaultManagerSettings
-    burl <- parseBaseUrl "http://api.fixer.io/"
-    res <- runClientM (getLatest Nothing Nothing) (ClientEnv man burl)
+    res <- autoRunFixerClient $ getLatest Nothing Nothing
     case res of
         Left err -> die $ show err
         Right v -> print v
-
-fixerAPI :: Proxy FixerAPI
-fixerAPI = Proxy
-
-type FixerAPI = GetLatest :<|> GetAtDate
-
-type GetLatest
-     = "latest" :> QueryParam "base" Currency :> QueryParam "symbols" Symbols :> Get '[ JSON] Rates
-
-type GetAtDate
-     = Capture "date" Day :> QueryParam "base" Currency :> QueryParam "symbols" Symbols :> Get '[ JSON] Rates
-
-getLatest :: Maybe Currency -> Maybe Symbols -> ClientM Rates
-getAtDate :: Day -> Maybe Currency -> Maybe Symbols -> ClientM Rates
-getLatest :<|> getAtDate = client fixerAPI
