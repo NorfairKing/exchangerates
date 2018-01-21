@@ -1,24 +1,29 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Fixer.Cache
     ( FixerCache(..)
     , emptyFixerCache
     , insertRatesInCache
     , lookupRatesInCache
+    , smartInsertInCache
+    , smartLookupRateInCache
     -- Defaults
     , defaultBaseCurrency
-    , allSymbols
+    , allSymbolsExcept
     -- Helpers
     , convertToBaseWithRate
     , rawInsertInCache
     , rawLookupInCache
     ) where
 
+import Control.Monad
 import Data.Aeson
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Map (Map)
+import Data.Maybe
 import Data.Time
 import Data.Validity
 import GHC.Generics (Generic)
@@ -29,7 +34,18 @@ newtype FixerCache = FixerCache
     { unFixerCache :: Map Day (Map Currency (Map Currency Rate))
     } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
-instance Validity FixerCache
+instance Validity FixerCache where
+    validate FixerCache {..} =
+        mconcat
+            [ unFixerCache <?!> "unFixerCache"
+            , let go :: Map Currency (Map Currency Rate) -> Bool
+                  go m =
+                      not . or $
+                      M.mapWithKey (\c m_ -> isJust (M.lookup c m_)) m
+              in all go unFixerCache <?@>
+                 "Does not contain conversions to from a currency to itself"
+            ]
+    isValid = isValidByValidating
 
 emptyFixerCache :: FixerCache
 emptyFixerCache = FixerCache M.empty
@@ -53,21 +69,20 @@ rawLookupInCache d from to (FixerCache fc) =
 defaultBaseCurrency :: Currency
 defaultBaseCurrency = EUR
 
-allSymbols :: Symbols
-allSymbols = Symbols $ NE.fromList [minBound .. maxBound]
+allSymbolsExcept :: Currency -> Symbols
+allSymbolsExcept base =
+    Symbols $ NE.fromList $ filter (/= base) [minBound .. maxBound]
 
 insertRatesInCache :: Rates -> FixerCache -> FixerCache
 insertRatesInCache rs fc =
     if ratesBase rs == defaultBaseCurrency
-        then insertRatesAtDefaultBase rs
+        then insertRatesAsIs rs
             -- If we're not already using the base, then we need to see if we can figure out how many
             -- of this base we can get for the default base
             -- We can figure this out in two ways:
             -- 1 if the default base is in the rates
         else case M.lookup defaultBaseCurrency $ ratesRates rs of
-                 Just r ->
-                     insertRatesAtDefaultBase $
-                     convertToBaseWithRate defaultBaseCurrency r rs
+                 Just r -> insertRatesAtOtherBase r rs
                  Nothing
                     -- or
                     -- 2 if the default base is in the cache
@@ -77,30 +92,67 @@ insertRatesInCache rs fc =
                               (ratesBase rs)
                               defaultBaseCurrency
                               fc of
-                         Just r ->
-                             insertRatesAtDefaultBase $
-                             convertToBaseWithRate defaultBaseCurrency r rs
+                         Just r -> insertRatesAtOtherBase r rs
                          Nothing
                             -- If we find neither, then we just save in the cache as-is
-                          -> insertRatesAt (ratesBase rs) rs
+                          -> insertRatesAsIs rs
   where
-    insertRatesAtDefaultBase :: Rates -> FixerCache
-    insertRatesAtDefaultBase = insertRatesAt defaultBaseCurrency
-    insertRatesAt :: Currency -> Rates -> FixerCache
-    insertRatesAt base = M.foldlWithKey (go base) fc . ratesRates
+    insertRatesAsIs :: Rates -> FixerCache
+    insertRatesAsIs rates =
+        M.foldlWithKey (go (ratesBase rates)) fc $ ratesRates rates
+    insertRatesAtOtherBase :: Rate -> Rates -> FixerCache
+    insertRatesAtOtherBase r =
+        insertRatesAsIs . convertToBaseWithRate defaultBaseCurrency r
     go :: Currency -> FixerCache -> Currency -> Rate -> FixerCache
-    go base fc_ c r = rawInsertInCache (ratesDate rs) base c r fc_
+    go base fc_ c r = smartInsertInCache (ratesDate rs) base c r fc_
+
+smartInsertInCache ::
+       Day -> Currency -> Currency -> Rate -> FixerCache -> FixerCache
+smartInsertInCache date from to rate fc =
+    if from == to
+        then fc
+        else rawInsertInCache date from to rate fc
 
 -- If the exact rates are already in the exact right spot, look them up.
 lookupRatesInCache :: Day -> Currency -> Symbols -> FixerCache -> Maybe Rates
-lookupRatesInCache date base (Symbols nec) (FixerCache fc) =
-    Rates base date <$> go
-  where
-    go :: Maybe (Map Currency Rate)
-    go = do
-        dm <- M.lookup date fc
-        bm <- M.lookup base dm
-        (M.fromList . NE.toList) <$> mapM (\to -> (,) to <$> M.lookup to bm) nec
+lookupRatesInCache date base (Symbols nec) fc =
+    Rates base date <$>
+    (M.fromList <$>
+     mapM
+         (\to -> (,) to <$> smartLookupRateInCache date base to fc)
+         (NE.filter (/= base) nec))
+
+smartLookupRateInCache ::
+       Day -> Currency -> Currency -> FixerCache -> Maybe Rate
+smartLookupRateInCache date from to fc@(FixerCache m) =
+    if from == to
+        then Just oneRate
+        else case rawLookupInCache date from to fc of
+                 Just r -> pure r
+                 -- First try to look up at the correct base currency
+                 -- If that works, return it.
+                 -- Otherwise, try all the other bases at that day, and convert if necessary.
+                 Nothing -> do
+                     dm <- M.lookup date m
+                     msum $
+                         M.elems $
+                         flip M.mapWithKey dm $ \newFrom nfm ->
+                             lookupVia newFrom from to nfm
+
+lookupVia :: Currency -> Currency -> Currency -> Map Currency Rate -> Maybe Rate
+lookupVia newFrom from to nfm = do
+    nfr <-
+        if newFrom == from
+            then Just oneRate
+            else M.lookup from nfm
+    -- This is the rate at which we can convert from newFrom to from
+    -- for each 'from', you get '1/nfr' newFroms
+    tr <-
+        if newFrom == to
+            then Just oneRate
+            else M.lookup to nfm
+    -- This is the rate at which we can convert from newFrom to to
+    pure $ divRate tr nfr
 
 -- In the map, we have the info that
 -- for 1 base currency, you get s of the currency in the key.

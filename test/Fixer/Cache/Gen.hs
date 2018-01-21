@@ -10,4 +10,5 @@ import Fixer.Cache
 
 instance GenUnchecked FixerCache
 
-instance GenValid FixerCache
+instance GenValid FixerCache where
+    genValid = (FixerCache <$> genValid) `suchThat` isValid
