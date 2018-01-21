@@ -6,6 +6,7 @@ module Fixer.Client
     , FClient
     , getLatest
     , getAtDate
+    , withFileCache
     , readCacheFromFileIfExists
     , flushCacheToFile
     ) where
@@ -69,6 +70,13 @@ withCache date mc ms func = do
                 modify (insertRatesInCache rates)
                 pure rates
         Just rates -> pure rates
+
+withFileCache :: FilePath -> FClient a -> FClient a
+withFileCache path func = do
+    readCacheFromFileIfExists path
+    r <- func
+    flushCacheToFile path
+    pure r
 
 readCacheFromFileIfExists :: FilePath -> FClient ()
 readCacheFromFileIfExists fp = do
