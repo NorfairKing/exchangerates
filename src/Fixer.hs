@@ -1,13 +1,12 @@
+-- | The top-level API for the Haskell Fixer client.
+--
+-- There is an example usage in the 'README' file.
 module Fixer
-    ( fixer
-    -- * Top-level API
-    , FClient
+    ( FClient
     , autoRunFixerClient
-    , runFixerClient
     , getLatest
     , getAtDate
-    , readCacheFromFileIfExists
-    , flushCacheToFile
+    , withFileCache
     -- * Types
     , Currency(..)
     , Symbols(..)
@@ -20,23 +19,8 @@ module Fixer
     , fromGregorian
     ) where
 
-import System.Exit
-
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Time
 
 import Fixer.Client
 import Fixer.Types
-
-fixer :: IO ()
-fixer = do
-    res <-
-        autoRunFixerClient $ do
-            let file = "/tmp/fixer.cache"
-            readCacheFromFileIfExists file
-            rates <- getAtDate (fromGregorian 2018 01 19) Nothing Nothing
-            flushCacheToFile file
-            pure rates
-    case res of
-        Left err -> die $ show err
-        Right v -> print v

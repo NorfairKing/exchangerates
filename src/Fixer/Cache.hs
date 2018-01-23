@@ -30,6 +30,10 @@ import GHC.Generics (Generic)
 
 import Fixer.Types
 
+-- | A cache for currency rates
+--
+-- This cache uses 'EUR' as the base currency, but will still cache
+-- rates appropriately if rates with a different base currency are cached.
 newtype FixerCache = FixerCache
     { unFixerCache :: Map Day (Map Currency (Map Currency Rate))
     } deriving (Show, Eq, Generic, FromJSON, ToJSON)
@@ -47,9 +51,13 @@ instance Validity FixerCache where
             ]
     isValid = isValidByValidating
 
+-- | The empty Cache
 emptyFixerCache :: FixerCache
 emptyFixerCache = FixerCache M.empty
 
+-- | Insert a rate into the cache as-is.
+--
+-- You probably want to be using 'insertRatesInCache' or 'smartInsertInCache' instead.
 rawInsertInCache ::
        Day -> Currency -> Currency -> Rate -> FixerCache -> FixerCache
 rawInsertInCache d from to rate (FixerCache fc) = FixerCache $ M.alter go1 d fc
@@ -62,17 +70,25 @@ rawInsertInCache d from to rate (FixerCache fc) = FixerCache $ M.alter go1 d fc
     go2 Nothing = Just $ M.singleton to rate
     go2 (Just c2) = Just $ M.insert to rate c2
 
+-- | Lookup a rate in the cache as-is.
+--
+-- You probably want to be using 'smartLookupRateInCache' instead.
 rawLookupInCache :: Day -> Currency -> Currency -> FixerCache -> Maybe Rate
 rawLookupInCache d from to (FixerCache fc) =
     M.lookup d fc >>= M.lookup from >>= M.lookup to
 
+-- | The default base currency. Currently this is 'EUR'
 defaultBaseCurrency :: Currency
 defaultBaseCurrency = EUR
 
+-- | The symbols to get by default, given a base currency.
 allSymbolsExcept :: Currency -> Symbols
 allSymbolsExcept base =
     Symbols $ NE.fromList $ filter (/= base) [minBound .. maxBound]
 
+-- | Insert a result into the cache.
+--
+-- This is probably the function you want to use, it does all the smartness.
 insertRatesInCache :: Rates -> FixerCache -> FixerCache
 insertRatesInCache rs fc =
     if ratesBase rs == defaultBaseCurrency
@@ -106,6 +122,7 @@ insertRatesInCache rs fc =
     go :: Currency -> FixerCache -> Currency -> Rate -> FixerCache
     go base fc_ c r = smartInsertInCache (ratesDate rs) base c r fc_
 
+-- | Insert a rate in a cache, but don't insert it if the from and to currencies are the same.
 smartInsertInCache ::
        Day -> Currency -> Currency -> Rate -> FixerCache -> FixerCache
 smartInsertInCache date from to rate fc =
@@ -113,7 +130,9 @@ smartInsertInCache date from to rate fc =
         then fc
         else rawInsertInCache date from to rate fc
 
--- If the exact rates are already in the exact right spot, look them up.
+-- | Look up multiple rates in a cache.
+--
+-- This function uses 'smartLookupRateInCache' for each requested symbol.
 lookupRatesInCache :: Day -> Currency -> Symbols -> FixerCache -> Maybe Rates
 lookupRatesInCache date base (Symbols nec) fc =
     Rates base date <$>
@@ -122,6 +141,10 @@ lookupRatesInCache date base (Symbols nec) fc =
          (\to -> (,) to <$> smartLookupRateInCache date base to fc)
          (NE.filter (/= base) nec))
 
+-- | Look up a rate in a cache.
+--
+-- This function will try to be smart about what it can find, but will
+-- give up after one redirection.
 smartLookupRateInCache ::
        Day -> Currency -> Currency -> FixerCache -> Maybe Rate
 smartLookupRateInCache date from to fc@(FixerCache m) =
@@ -154,6 +177,8 @@ lookupVia newFrom from to nfm = do
     -- This is the rate at which we can convert from newFrom to to
     pure $ divRate tr nfr
 
+-- | Convert a set of rates to another base currency with the given rate of the new base currency
+-- with respect to the old base currency.
 -- In the map, we have the info that
 -- for 1 base currency, you get s of the currency in the key.
 --

@@ -22,9 +22,11 @@ fixerAPI = Proxy
 
 type FixerAPI = GetLatest :<|> GetAtDate
 
+-- | @/latest?base=\<base\>&symbols=\<symbols\>@
 type GetLatest
      = "latest" :> QueryParam "base" Currency :> QueryParam "symbols" Symbols :> Get '[ JSON] Rates
 
+-- | @/\<date\>?base=\<base\>&symbols=\<symbols\>@
 type GetAtDate
      = Capture "date" Day :> QueryParam "base" Currency :> QueryParam "symbols" Symbols :> Get '[ JSON] Rates
 

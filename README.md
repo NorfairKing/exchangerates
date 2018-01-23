@@ -17,8 +17,48 @@ main = do
     rates <-
         autoRunFixerClient $
           withFileCache "/tmp/fixer.cache" $
-            getLatest (Just EUR) Nothing
+            getAtDate (fromGregorian 2018 01 19) (Just EUR) Nothing
     case rates of
         Left err -> die $ show err
         Right v -> print v
+```
+
+```
+Rates
+  { ratesBase = EUR
+  , ratesDate = 2018-01-19
+  , ratesRates = fromList
+    [ (AUD,Rate {unRate = 6891408149802333 % 4503599627370496})
+    , (BGN,Rate {unRate = 550508759450701 % 281474976710656})
+    , (BRL,Rate {unRate = 8852275427559447 % 2251799813685248})
+    , (CAD,Rate {unRate = 3433093995944529 % 2251799813685248})
+    , (CHF,Rate {unRate = 5295332441862229 % 4503599627370496})
+    , (CNY,Rate {unRate = 8836175058891597 % 1125899906842624})
+    , (CZK,Rate {unRate = 3579376541341057 % 140737488355328})
+    , (DKK,Rate {unRate = 8382775166406073 % 1125899906842624})
+    , (GBP,Rate {unRate = 3979605810725939 % 4503599627370496})
+    , (HKD,Rate {unRate = 5393848683710959 % 562949953421312})
+    , (HRK,Rate {unRate = 4185645493678139 % 562949953421312})
+    , (HUF,Rate {unRate = 5439503924933427 % 17592186044416})
+    , (IDR,Rate {unRate = 16316 % 1})
+    , (ILS,Rate {unRate = 2355213720128743 % 562949953421312})
+    , (INR,Rate {unRate = 2752790087858127 % 35184372088832})
+    , (JPY,Rate {unRate = 4768889792920289 % 35184372088832})
+    , (KRW,Rate {unRate = 2873903492680909 % 2199023255552})
+    , (MXN,Rate {unRate = 6422133068630327 % 281474976710656})
+    , (MYR,Rate {unRate = 5433592950422503 % 1125899906842624})
+    , (NOK,Rate {unRate = 5417999236712733 % 562949953421312})
+    , (NZD,Rate {unRate = 3790004266413641 % 2251799813685248})
+    , (PHP,Rate {unRate = 8745146051423371 % 140737488355328})
+    , (PLN,Rate {unRate = 2348402025692345 % 562949953421312})
+    , (RON,Rate {unRate = 2623009012971261 % 562949953421312})
+    , (RUB,Rate {unRate = 609850721415725 % 8796093022208})
+    , (SEK,Rate {unRate = 5535655776977787 % 562949953421312})
+    , (SGD,Rate {unRate = 1821480869289997 % 1125899906842624})
+    , (THB,Rate {unRate = 2749236466277155 % 70368744177664})
+    , (TRY,Rate {unRate = 5241852196287205 % 1125899906842624})
+    , (USD,Rate {unRate = 5519161343342543 % 4503599627370496})
+    , (ZAR,Rate {unRate = 8418916553415721 % 562949953421312})
+    ]
+  }
 ```

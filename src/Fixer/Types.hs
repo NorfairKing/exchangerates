@@ -36,7 +36,7 @@ import GHC.Real (Ratio(..))
 import Servant.API
 import Text.Read
 
--- A positive and non-0 ratio
+-- | A positive and non-0 ratio
 newtype Rate = Rate
     { unRate :: Ratio Natural
     } deriving (Show, Eq, Generic)
@@ -59,6 +59,11 @@ rateToRational (Rate (num :% den)) = fromIntegral num :% fromIntegral den
 rateToDouble :: Rate -> Double
 rateToDouble = fromRational . rateToRational
 
+-- | A rate is valid if:
+--
+-- * The ratio inside is valid.
+-- * The ratio is not zero.
+-- * The ratio is normalised.
 instance Validity Rate where
     validate r@Rate {..} =
         mconcat

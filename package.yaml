@@ -41,17 +41,6 @@ library:
     - Fixer.Client
     - Fixer.Cache
 
-executables:
-  fixer:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - fixer
-
 tests:
   fixer-test:
     main: Spec.hs

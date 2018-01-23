@@ -37,6 +37,7 @@ autoRunFixerClient func = do
     burl <- parseBaseUrl "http://api.fixer.io/"
     runFixerClient emptyFixerCache (ClientEnv man burl) func
 
+-- | Run a 'FClient' action with full control over the inputs.
 runFixerClient ::
        FixerCache -> ClientEnv -> FClient a -> IO (Either ServantError a)
 runFixerClient fc ce func = runClientM (evalStateT (runFClient func) fc) ce
@@ -71,6 +72,16 @@ withCache date mc ms func = do
                 pure rates
         Just rates -> pure rates
 
+-- | Declare that we want to use the given file as a persistent cache.
+--
+-- Note that 'FClient' will still use a per-run cache if this function is not used.
+-- This function only makes sure that the cache is persistent accross runs.
+--
+-- > withFileCache path func = do
+-- >    readCacheFromFileIfExists path
+-- >    r <- func
+-- >    flushCacheToFile path
+-- >    pure r
 withFileCache :: FilePath -> FClient a -> FClient a
 withFileCache path func = do
     readCacheFromFileIfExists path
@@ -78,6 +89,7 @@ withFileCache path func = do
     flushCacheToFile path
     pure r
 
+-- | Read a persistent cache from the given file if that file exists.
 readCacheFromFileIfExists :: FilePath -> FClient ()
 readCacheFromFileIfExists fp = do
     fe <- liftIO $ doesFileExist fp
@@ -89,6 +101,7 @@ readCacheFromFileIfExists fp = do
         Nothing -> pure ()
         Just fc -> put fc
 
+-- | Flush the currently gathered cache to the given file.
 flushCacheToFile :: FilePath -> FClient ()
 flushCacheToFile fp = do
     c <- get
