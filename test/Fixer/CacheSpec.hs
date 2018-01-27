@@ -18,9 +18,14 @@ import Fixer.Types.Gen ()
 
 spec :: Spec
 spec = do
-    eqSpecOnValid @FixerCache
-    genValidSpec @FixerCache
-    jsonSpecOnValid @FixerCache
+    rateCacheSpec
+    fixerCacheSpec
+
+rateCacheSpec :: Spec
+rateCacheSpec = do
+    eqSpecOnValid @RateCache
+    genValidSpec @RateCache
+    jsonSpecOnValid @RateCache
     describe "rawInsertInCache" $
         it "produces valid caches if the currencies are distinct" $
         forAllValid $ \d ->
@@ -93,8 +98,8 @@ spec = do
                     forAll (genValid `suchThat` (/= base)) $ \symbol ->
                         forAllValid $ \rate ->
                             let cache =
-                                    FixerCache
-                                    { unFixerCache =
+                                    RateCache
+                                    { unRateCache =
                                           M.fromList
                                               [ ( date
                                                 , M.fromList
@@ -169,3 +174,16 @@ spec = do
                             rates'' = convertToBaseWithRate base rate rates'
                         in M.lookup (ratesBase rates) (ratesRates rates'') `shouldBe`
                            Just (divRate oneRate rate)
+
+fixerCacheSpec :: Spec
+fixerCacheSpec = do
+    eqSpecOnValid @FixerCache
+    genValidSpec @FixerCache
+    jsonSpecOnValid @FixerCache
+    describe "insertRates" $
+        it "produces valid caches" $ producesValidsOnValids3 insertRates
+    describe "lookupRates" $
+        it "produces valid results" $
+        forAllValid $ \dn ->
+         forAllValid $ \dr ->
+                producesValidsOnValids3 $ lookupRates dn dr

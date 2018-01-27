@@ -8,6 +8,7 @@ module Fixer.Client
     , FClient
     , getLatest
     , getAtDate
+    , RatesResult(..)
     , withFileCache
     , readCacheFromFileIfExists
     , flushCacheToFile
@@ -18,6 +19,7 @@ import Control.Concurrent.STM
 import Control.Monad.Reader
 import Data.Maybe
 import Data.Time
+import Data.Validity
 import qualified Data.Yaml as Yaml
 import GHC.Generics
 import Network.HTTP.Client (defaultManagerSettings, newManager)
@@ -81,53 +83,79 @@ runFixerClient env ce func = runClientM (runReaderT (runFClient func) env) ce
 -- way to predict what date the last rates appeared on, so we still look in the
 -- cache at the current date.  For maximum cache hits, use 'getAtDate' and only
 -- look at the past beyond the last three days.
-getLatest :: Maybe Currency -> Maybe Symbols -> FClient Rates
+getLatest :: Maybe Currency -> Maybe Symbols -> FClient RatesResult
 getLatest mc ms = do
     date <- liftIO $ utctDay <$> getCurrentTime
     withCacheAndRate date mc ms $ Raw.getLatest mc ms
 
 -- | Get the rates at a specific date.
-getAtDate :: Day -> Maybe Currency -> Maybe Symbols -> FClient Rates
+getAtDate :: Day -> Maybe Currency -> Maybe Symbols -> FClient RatesResult
 getAtDate date mc ms = withCacheAndRate date mc ms $ Raw.getAtDate date mc ms
 
 microsecondsPerSecond :: Int
 microsecondsPerSecond = 1000 * 1000
 
+data RatesResult
+    = DateNotInPast
+    | RateDoesNotExist
+    | RatesFound Rates
+    deriving (Show, Eq, Generic)
+
+instance Validity RatesResult
+
 withCacheAndRate ::
-       Day -> Maybe Currency -> Maybe Symbols -> ClientM Rates -> FClient Rates
+       Day
+    -> Maybe Currency
+    -> Maybe Symbols
+    -> ClientM Rates
+    -> FClient RatesResult
 withCacheAndRate date mc ms func = do
     let base = fromMaybe defaultBaseCurrency mc
     let symbols = fromMaybe (allSymbolsExcept base) ms
     cacheVar <- asks fEnvCache
+    now <- liftIO $ getCurrentTime
+    let nowDate = utctDay now
     c <- liftIO $ readTVarIO cacheVar
-    case lookupRatesInCache date base symbols c of
-        Nothing -> do
-            lastFetchVar <- asks fEnvLastFetch
-            now <- liftIO $ getCurrentTime
-            mLastFetch <- liftIO $ readTVarIO lastFetchVar
-            delayTime <- asks $ confRateDelay . fEnvConfig
-            let timeToWait =
-                    max 0 $
-                    case mLastFetch of
-                        Nothing -> 0
-                        Just lastFetch ->
-                            let timeSinceLastFetch = diffUTCTime now lastFetch
-                                timeSinceLastFetchMicro =
-                                    round $
-                                    (realToFrac timeSinceLastFetch *
-                                     fromIntegral microsecondsPerSecond :: Double)
-                            in delayTime - timeSinceLastFetchMicro
-            -- Wait
-            liftIO $ threadDelay timeToWait
-            -- Make the request
-            rates <- FClient $ lift func
-            after <- liftIO getCurrentTime
+    case lookupRates nowDate date base symbols c of
+        NotInCache -> do
+            rates <- rateLimit $ func
             liftIO $
-                atomically $ do
-                    writeTVar lastFetchVar $ Just after
-                    modifyTVar' cacheVar (insertRatesInCache rates)
-            pure rates
-        Just rates -> pure rates
+                atomically $
+                    modifyTVar' cacheVar (insertRates nowDate rates)
+            pure $
+                if ratesDate rates == date
+                    then RatesFound rates
+                    else if ratesDate rates >= nowDate
+                             then DateNotInPast
+                             else RateDoesNotExist
+        CacheDateNotInPast -> pure DateNotInPast
+        WillNeverExist -> pure RateDoesNotExist
+        InCache r -> pure $ RatesFound r
+
+rateLimit :: ClientM a -> FClient a
+rateLimit func = do
+    now <- liftIO $ getCurrentTime
+    lastFetchVar <- asks fEnvLastFetch
+    mLastFetch <- liftIO $ readTVarIO lastFetchVar
+    delayTime <- asks $ confRateDelay . fEnvConfig
+    let timeToWait =
+            max 0 $
+            case mLastFetch of
+                Nothing -> 0
+                Just lastFetch ->
+                    let timeSinceLastFetch = diffUTCTime now lastFetch
+                        timeSinceLastFetchMicro =
+                            round $
+                            (realToFrac timeSinceLastFetch *
+                             fromIntegral microsecondsPerSecond :: Double)
+                    in delayTime - timeSinceLastFetchMicro
+            -- Wait
+    liftIO $ threadDelay timeToWait
+            -- Make the request
+    res <- FClient $ lift func
+    after <- liftIO getCurrentTime
+    liftIO $ atomically $ writeTVar lastFetchVar $ Just after
+    pure res
 
 -- | Declare that we want to use the given file as a persistent cache.
 --
