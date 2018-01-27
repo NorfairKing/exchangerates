@@ -109,21 +109,21 @@ withCacheAndRate ::
     -> Maybe Symbols
     -> ClientM Rates
     -> FClient RatesResult
-withCacheAndRate date mc ms func = do
+withCacheAndRate requestDate mc ms func = do
     let base = fromMaybe defaultBaseCurrency mc
     let symbols = fromMaybe (allSymbolsExcept base) ms
     cacheVar <- asks fEnvCache
     now <- liftIO $ getCurrentTime
     let nowDate = utctDay now
     c <- liftIO $ readTVarIO cacheVar
-    case lookupRates nowDate date base symbols c of
+    case lookupRates nowDate requestDate base symbols c of
         NotInCache -> do
             rates <- rateLimit $ func
             liftIO $
                 atomically $
-                    modifyTVar' cacheVar (insertRates nowDate rates)
+                modifyTVar' cacheVar (insertRates nowDate requestDate rates)
             pure $
-                if ratesDate rates == date
+                if ratesDate rates == requestDate
                     then RatesFound rates
                     else if ratesDate rates >= nowDate
                              then DateNotInPast

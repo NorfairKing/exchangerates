@@ -57,13 +57,17 @@ instance ToJSON FixerCache where
             , "days-without-rates" .= fCacheDaysWithoutRates
             ]
 
-insertRates :: Day -> Rates -> FixerCache -> FixerCache
-insertRates d r fc =
+insertRates :: Day  -- ^ The current date
+    -> Day  -- ^ The requested date
+    -> Rates -> FixerCache -> FixerCache
+insertRates n d r fc =
     if ratesDate r == d
         then let rc' = insertRatesInCache r $ fCacheRates fc
              in fc {fCacheRates = rc'}
-        else let dwr' = S.insert d $ fCacheDaysWithoutRates fc
-             in fc {fCacheDaysWithoutRates = dwr'}
+        else if d >= n
+                 then fc
+                 else let dwr' = S.insert d $ fCacheDaysWithoutRates fc
+                      in fc {fCacheDaysWithoutRates = dwr'}
 
 data FixerCacheResult
     = NotInCache
@@ -78,8 +82,8 @@ instance Validity FixerCacheResult
 --
 --
 lookupRates ::
-       Day -- The current date
-    -> Day -- The requested date
+       Day -- ^ The current date
+    -> Day -- ^ The requested date
     -> Currency
     -> Symbols
     -> FixerCache
