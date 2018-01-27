@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Caches for the raw API
 module Fixer.Cache
     ( FixerCache(..)
     , insertRates
@@ -38,6 +39,10 @@ import GHC.Generics (Generic)
 
 import Fixer.Types
 
+-- | A complete cache for the raw API.
+--
+-- This includes a cache for the rates we get, as well as a cache for the
+-- rates we do not get.
 data FixerCache = FixerCache
     { fCacheRates :: RateCache
     , fCacheDaysWithoutRates :: Set Day
@@ -57,9 +62,13 @@ instance ToJSON FixerCache where
             , "days-without-rates" .= fCacheDaysWithoutRates
             ]
 
-insertRates :: Day  -- ^ The current date
-    -> Day  -- ^ The requested date
-    -> Rates -> FixerCache -> FixerCache
+-- | Insert a given raw response in a 'FixerCache'
+insertRates ::
+       Day -- ^ The current date
+    -> Day -- ^ The requested date
+    -> Rates
+    -> FixerCache
+    -> FixerCache
 insertRates n d r fc =
     if ratesDate r == d
         then let rc' = insertRatesInCache r $ fCacheRates fc
@@ -69,18 +78,17 @@ insertRates n d r fc =
                  else let dwr' = S.insert d $ fCacheDaysWithoutRates fc
                       in fc {fCacheDaysWithoutRates = dwr'}
 
+-- | The result of looking up rates in a 'FixerCache'
 data FixerCacheResult
     = NotInCache
-    | CacheDateNotInPast
-    | WillNeverExist
+    | CacheDateNotInPast -- ^ Because we requested a date in the future
+    | WillNeverExist -- ^ Because it was on a weekend or holiday
     | InCache Rates
     deriving (Show, Eq, Generic)
 
 instance Validity FixerCacheResult
 
 -- | Look up rates in cache
---
---
 lookupRates ::
        Day -- ^ The current date
     -> Day -- ^ The requested date
@@ -97,6 +105,7 @@ lookupRates n d c s FixerCache {..} =
                           Nothing -> NotInCache
                           Just r -> InCache r
 
+-- | The empty 'FixerCache'
 emptyFixerCache :: FixerCache
 emptyFixerCache =
     FixerCache {fCacheRates = emptyRateCache, fCacheDaysWithoutRates = S.empty}

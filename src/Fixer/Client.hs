@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+-- | The transparently caching client
 module Fixer.Client
     ( autoRunFixerClient
     , defaultConfig
@@ -30,6 +31,7 @@ import qualified Fixer.API as Raw
 import Fixer.Cache
 import Fixer.Types
 
+-- | A client function
 newtype FClient a = FClient
     { runFClient :: ReaderT FEnv ClientM a
     } deriving (Functor, Applicative, Monad, MonadReader FEnv, MonadIO)
@@ -66,6 +68,7 @@ makeEnv = do
         , fEnvCache = cacheVar
         }
 
+-- | A default configuration for the client: One second of delay between calls
 defaultConfig :: Config
 defaultConfig =
     Config
@@ -95,9 +98,10 @@ getAtDate date mc ms = withCacheAndRate date mc ms $ Raw.getAtDate date mc ms
 microsecondsPerSecond :: Int
 microsecondsPerSecond = 1000 * 1000
 
+-- | The result of calling the API the local cache
 data RatesResult
-    = DateNotInPast
-    | RateDoesNotExist
+    = DateNotInPast -- ^ because you tried to call the API for a future date
+    | RateDoesNotExist -- ^ because the date is on a weekend, for example
     | RatesFound Rates
     deriving (Show, Eq, Generic)
 
