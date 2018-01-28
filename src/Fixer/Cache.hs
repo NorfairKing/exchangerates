@@ -1,10 +1,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | Caches for the raw API
 module Fixer.Cache
     ( FixerCache(..)
+    , insertRates
+    , FixerCacheResult(..)
+    , lookupRates
     , emptyFixerCache
+    , RateCache(..)
+    , emptyRateCache
     , insertRatesInCache
     , lookupRatesInCache
     , smartInsertInCache
@@ -24,43 +31,116 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
+import qualified Data.Set as S
+import Data.Set (Set)
 import Data.Time
 import Data.Validity
 import GHC.Generics (Generic)
 
 import Fixer.Types
 
+-- | A complete cache for the raw API.
+--
+-- This includes a cache for the rates we get, as well as a cache for the
+-- rates we do not get.
+data FixerCache = FixerCache
+    { fCacheRates :: RateCache
+    , fCacheDaysWithoutRates :: Set Day
+    } deriving (Show, Eq, Generic)
+
+instance Validity FixerCache
+
+instance FromJSON FixerCache where
+    parseJSON =
+        withObject "FixerCache" $ \o ->
+            FixerCache <$> o .: "rates" <*> o .: "days-without-rates"
+
+instance ToJSON FixerCache where
+    toJSON FixerCache {..} =
+        object
+            [ "rates" .= fCacheRates
+            , "days-without-rates" .= fCacheDaysWithoutRates
+            ]
+
+-- | Insert a given raw response in a 'FixerCache'
+insertRates ::
+       Day -- ^ The current date
+    -> Day -- ^ The requested date
+    -> Rates
+    -> FixerCache
+    -> FixerCache
+insertRates n d r fc =
+    if ratesDate r == d
+        then let rc' = insertRatesInCache r $ fCacheRates fc
+             in fc {fCacheRates = rc'}
+        else if d >= n
+                 then fc
+                 else let dwr' = S.insert d $ fCacheDaysWithoutRates fc
+                      in fc {fCacheDaysWithoutRates = dwr'}
+
+-- | The result of looking up rates in a 'FixerCache'
+data FixerCacheResult
+    = NotInCache
+    | CacheDateNotInPast -- ^ Because we requested a date in the future
+    | WillNeverExist -- ^ Because it was on a weekend or holiday
+    | InCache Rates
+    deriving (Show, Eq, Generic)
+
+instance Validity FixerCacheResult
+
+-- | Look up rates in cache
+lookupRates ::
+       Day -- ^ The current date
+    -> Day -- ^ The requested date
+    -> Currency
+    -> Symbols
+    -> FixerCache
+    -> FixerCacheResult
+lookupRates n d c s FixerCache {..} =
+    if d >= n
+        then CacheDateNotInPast
+        else if S.member d fCacheDaysWithoutRates
+                 then WillNeverExist
+                 else case lookupRatesInCache d c s fCacheRates of
+                          Nothing -> NotInCache
+                          Just r -> InCache r
+
+-- | The empty 'FixerCache'
+emptyFixerCache :: FixerCache
+emptyFixerCache =
+    FixerCache {fCacheRates = emptyRateCache, fCacheDaysWithoutRates = S.empty}
+
 -- | A cache for currency rates
 --
 -- This cache uses 'EUR' as the base currency, but will still cache
 -- rates appropriately if rates with a different base currency are cached.
-newtype FixerCache = FixerCache
-    { unFixerCache :: Map Day (Map Currency (Map Currency Rate))
+newtype RateCache = RateCache
+    { unRateCache :: Map Day (Map Currency (Map Currency Rate))
     } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
-instance Validity FixerCache where
-    validate FixerCache {..} =
+instance Validity RateCache where
+    validate RateCache {..} =
         mconcat
-            [ unFixerCache <?!> "unFixerCache"
+            [ unRateCache <?!> "unRateCache"
             , let go :: Map Currency (Map Currency Rate) -> Bool
                   go m =
                       not . or $
                       M.mapWithKey (\c m_ -> isJust (M.lookup c m_)) m
-              in all go unFixerCache <?@>
+              in all go unRateCache <?@>
                  "Does not contain conversions to from a currency to itself"
             ]
     isValid = isValidByValidating
 
 -- | The empty Cache
-emptyFixerCache :: FixerCache
-emptyFixerCache = FixerCache M.empty
+emptyRateCache :: RateCache
+emptyRateCache = RateCache M.empty
 
 -- | Insert a rate into the cache as-is.
 --
 -- You probably want to be using 'insertRatesInCache' or 'smartInsertInCache' instead.
 rawInsertInCache ::
-       Day -> Currency -> Currency -> Rate -> FixerCache -> FixerCache
-rawInsertInCache d from to rate (FixerCache fc) = FixerCache $ M.alter go1 d fc
+       Day -> Currency -> Currency -> Rate -> RateCache -> RateCache
+rawInsertInCache d from to rate (RateCache fc) = RateCache $ M.alter go1 d fc
   where
     go1 :: Maybe (Map Currency (Map Currency Rate))
         -> Maybe (Map Currency (Map Currency Rate))
@@ -73,8 +153,8 @@ rawInsertInCache d from to rate (FixerCache fc) = FixerCache $ M.alter go1 d fc
 -- | Lookup a rate in the cache as-is.
 --
 -- You probably want to be using 'smartLookupRateInCache' instead.
-rawLookupInCache :: Day -> Currency -> Currency -> FixerCache -> Maybe Rate
-rawLookupInCache d from to (FixerCache fc) =
+rawLookupInCache :: Day -> Currency -> Currency -> RateCache -> Maybe Rate
+rawLookupInCache d from to (RateCache fc) =
     M.lookup d fc >>= M.lookup from >>= M.lookup to
 
 -- | The default base currency. Currently this is 'EUR'
@@ -89,7 +169,7 @@ allSymbolsExcept base =
 -- | Insert a result into the cache.
 --
 -- This is probably the function you want to use, it does all the smartness.
-insertRatesInCache :: Rates -> FixerCache -> FixerCache
+insertRatesInCache :: Rates -> RateCache -> RateCache
 insertRatesInCache rs fc =
     if ratesBase rs == defaultBaseCurrency
         then insertRatesAsIs rs
@@ -113,18 +193,18 @@ insertRatesInCache rs fc =
                             -- If we find neither, then we just save in the cache as-is
                           -> insertRatesAsIs rs
   where
-    insertRatesAsIs :: Rates -> FixerCache
+    insertRatesAsIs :: Rates -> RateCache
     insertRatesAsIs rates =
         M.foldlWithKey (go (ratesBase rates)) fc $ ratesRates rates
-    insertRatesAtOtherBase :: Rate -> Rates -> FixerCache
+    insertRatesAtOtherBase :: Rate -> Rates -> RateCache
     insertRatesAtOtherBase r =
         insertRatesAsIs . convertToBaseWithRate defaultBaseCurrency r
-    go :: Currency -> FixerCache -> Currency -> Rate -> FixerCache
+    go :: Currency -> RateCache -> Currency -> Rate -> RateCache
     go base fc_ c r = smartInsertInCache (ratesDate rs) base c r fc_
 
 -- | Insert a rate in a cache, but don't insert it if the from and to currencies are the same.
 smartInsertInCache ::
-       Day -> Currency -> Currency -> Rate -> FixerCache -> FixerCache
+       Day -> Currency -> Currency -> Rate -> RateCache -> RateCache
 smartInsertInCache date from to rate fc =
     if from == to
         then fc
@@ -133,7 +213,7 @@ smartInsertInCache date from to rate fc =
 -- | Look up multiple rates in a cache.
 --
 -- This function uses 'smartLookupRateInCache' for each requested symbol.
-lookupRatesInCache :: Day -> Currency -> Symbols -> FixerCache -> Maybe Rates
+lookupRatesInCache :: Day -> Currency -> Symbols -> RateCache -> Maybe Rates
 lookupRatesInCache date base (Symbols nec) fc =
     Rates base date <$>
     (M.fromList <$>
@@ -145,9 +225,8 @@ lookupRatesInCache date base (Symbols nec) fc =
 --
 -- This function will try to be smart about what it can find, but will
 -- give up after one redirection.
-smartLookupRateInCache ::
-       Day -> Currency -> Currency -> FixerCache -> Maybe Rate
-smartLookupRateInCache date from to fc@(FixerCache m) =
+smartLookupRateInCache :: Day -> Currency -> Currency -> RateCache -> Maybe Rate
+smartLookupRateInCache date from to fc@(RateCache m) =
     if from == to
         then Just oneRate
         else case rawLookupInCache date from to fc of

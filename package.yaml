@@ -25,6 +25,7 @@ dependencies:
 - mtl
 - servant
 - servant-client
+- stm
 - text
 - time
 - validity >=0.4.0.3

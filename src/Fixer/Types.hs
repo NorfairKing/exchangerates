@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Types for the API
 module Fixer.Types
     ( Rate(..)
     , oneRate
@@ -41,21 +42,32 @@ newtype Rate = Rate
     { unRate :: Ratio Natural
     } deriving (Show, Eq, Generic)
 
+-- | The identity of 'mulRate'
 oneRate :: Rate
 oneRate = Rate 1
 
+-- | Multiply two rates
 mulRate :: Rate -> Rate -> Rate
 mulRate (Rate r1) (Rate r2) = normaliseRate $ Rate (r1 * r2)
 
+-- | Divide one rate by another
 divRate :: Rate -> Rate -> Rate
 divRate (Rate r1) (Rate r2) = normaliseRate $ Rate (r1 / r2)
 
+-- | Ensure that a rate is internally normalised.
+-- This is a requirement for 'Validity'
 normaliseRate :: Rate -> Rate
 normaliseRate = Rate . fromRational . toRational . unRate
 
+-- | Convert a rate to a 'Ratio Integer' instead of 'Ratio Natural'.
+--
+-- This is a lossless transformation.
 rateToRational :: Rate -> Rational
 rateToRational (Rate (num :% den)) = fromIntegral num :% fromIntegral den
 
+-- | Convert a rate to a 'Double'.
+--
+-- This may not be a lossless transformation
 rateToDouble :: Rate -> Double
 rateToDouble = fromRational . rateToRational
 
@@ -89,6 +101,7 @@ instance FromJSON Rate where
 instance ToJSON Rate where
     toJSON = toJSON . unRate
 
+-- | A sum-type of the supported currencies on fixer.io
 data Currency
     = AUD
     | BGN
@@ -129,6 +142,7 @@ instance Validity Currency
 instance ToHttpApiData Currency where
     toUrlPiece = currencyToText
 
+-- | A nonempty list of 'Currency's
 newtype Symbols = Symbols
     { unSymbols :: NonEmpty Currency
     } deriving (Show, Eq, Ord, Generic)
@@ -138,6 +152,7 @@ instance Validity Symbols
 instance ToHttpApiData Symbols where
     toUrlPiece = T.intercalate "," . map toUrlPiece . NE.toList . unSymbols
 
+-- | The raw response of fixer.io
 data Rates = Rates
     { ratesBase :: Currency
     , ratesDate :: Day

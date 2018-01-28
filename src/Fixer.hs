@@ -4,13 +4,19 @@
 module Fixer
     ( FClient
     , autoRunFixerClient
+    , RatesResult(..)
     , getLatest
     , getAtDate
     , withFileCache
     -- * Types
     , Currency(..)
     , Symbols(..)
+    , Rate
     , Rates(..)
+    , oneRate
+    , mulRate
+    , divRate
+    , rateToDouble
     -- * Re-exports
     -- ** NonEmpty
     , NonEmpty(..)
