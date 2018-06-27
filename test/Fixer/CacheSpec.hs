@@ -181,7 +181,7 @@ fixerCacheSpec = do
     genValidSpec @FixerCache
     jsonSpecOnValid @FixerCache
     describe "insertRates" $
-        it "produces valid caches" $ producesValidsOnValids3 insertRates
+        it "produces valid caches" $ forAllValid $ \d -> producesValidsOnValids3 $ insertRates d
     describe "lookupRates" $
         it "produces valid results" $
         forAllValid $ \dn ->

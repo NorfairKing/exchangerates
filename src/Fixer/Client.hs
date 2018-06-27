@@ -26,6 +26,7 @@ import GHC.Generics
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
 import System.Directory (doesFileExist)
+import System.Exit (die)
 
 import qualified Fixer.API as Raw
 import Fixer.Cache
@@ -55,7 +56,7 @@ autoRunFixerClient func = do
     man <- newManager defaultManagerSettings
     burl <- parseBaseUrl "http://api.fixer.io/"
     env <- makeEnv
-    runFixerClient env (ClientEnv man burl) func
+    runFixerClient env (ClientEnv man burl Nothing) func
 
 makeEnv :: IO FEnv
 makeEnv = do
@@ -63,17 +64,17 @@ makeEnv = do
     cacheVar <- newTVarIO emptyFixerCache
     pure
         FEnv
-        { fEnvConfig = defaultConfig
-        , fEnvLastFetch = lastFetchVar
-        , fEnvCache = cacheVar
-        }
+            { fEnvConfig = defaultConfig
+            , fEnvLastFetch = lastFetchVar
+            , fEnvCache = cacheVar
+            }
 
 -- | A default configuration for the client: One second of delay between calls
 defaultConfig :: Config
 defaultConfig =
     Config
-    { confRateDelay = 1 * microsecondsPerSecond -- One second
-    }
+        { confRateDelay = 1 * microsecondsPerSecond -- One second
+        }
 
 -- | Run a 'FClient' action with full control over the inputs.
 runFixerClient :: FEnv -> ClientEnv -> FClient a -> IO (Either ServantError a)
@@ -152,7 +153,7 @@ rateLimit func = do
                             round $
                             (realToFrac timeSinceLastFetch *
                              fromIntegral microsecondsPerSecond :: Double)
-                    in delayTime - timeSinceLastFetchMicro
+                     in delayTime - timeSinceLastFetchMicro
             -- Wait
     liftIO $ threadDelay timeToWait
             -- Make the request
@@ -184,7 +185,13 @@ readCacheFromFileIfExists fp = do
     fe <- liftIO $ doesFileExist fp
     mfc <-
         if fe
-            then liftIO $ Yaml.decodeFile fp
+            then liftIO $ do
+                errOrRes <- Yaml.decodeFileEither fp
+                case errOrRes of
+                    Left e ->
+                        die $
+                        unlines ["Failed to read cache file YAML:", show e]
+                    Right r -> pure r
             else pure Nothing
     case mfc of
         Nothing -> pure ()
