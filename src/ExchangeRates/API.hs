@@ -2,8 +2,8 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | The raw API
-module Fixer.API
-    ( FixerAPI
+module ExchangeRates.API
+    ( ExchangeRatesAPI
     , GetLatest
     , GetAtDate
     , fixerAPI
@@ -16,14 +16,14 @@ import Data.Time
 import Servant.API
 import Servant.Client
 
-import Fixer.Types
+import ExchangeRates.Types
 
--- | A 'Proxy' for 'FixerAPI'
-fixerAPI :: Proxy FixerAPI
+-- | A 'Proxy' for 'ExchangeRatesAPI'
+fixerAPI :: Proxy ExchangeRatesAPI
 fixerAPI = Proxy
 
 -- | The full API at api.fixer.io
-type FixerAPI = GetLatest :<|> GetAtDate
+type ExchangeRatesAPI = GetLatest :<|> GetAtDate
 
 -- | Get latest rates
 --

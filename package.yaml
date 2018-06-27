@@ -1,6 +1,6 @@
-name:                fixer
+name:                exchangerates
 version:             0.0.0.0
-github:              "NorfairKing/fixer"
+github:              "NorfairKing/exchangerates"
 license:             BSD3
 author:              "Tom Sydney Kerckhove"
 maintainer:          "syd.kerckhove@gmail.com"
@@ -10,10 +10,10 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
-synopsis:            A Haskell client for http://fixer.io/
+synopsis:            A Haskell client for https://exchangeratesapi.io/
 category:            API
 
-description:         Please see the README on Github at <https://github.com/NorfairKing/fixer#readme>
+description:         Please see the README on Github at <https://github.com/NorfairKing/exchangerates#readme>
 
 dependencies:
 - aeson
@@ -22,6 +22,7 @@ dependencies:
 - directory
 - http-api-data
 - http-client
+- http-client-tls
 - mtl
 - servant
 - servant-client
@@ -36,14 +37,14 @@ dependencies:
 library:
   source-dirs: src
   exposed-modules:
-    - Fixer
-    - Fixer.Types
-    - Fixer.API
-    - Fixer.Client
-    - Fixer.Cache
+    - ExchangeRates
+    - ExchangeRates.Types
+    - ExchangeRates.API
+    - ExchangeRates.Client
+    - ExchangeRates.Cache
 
 tests:
-  fixer-test:
+  exchangerates-test:
     main: Spec.hs
     source-dirs: test/
     default-extensions:
@@ -56,7 +57,7 @@ tests:
     dependencies:
     - QuickCheck
     - base >=4.9 && <=5
-    - fixer
+    - exchangerates
     - genvalidity >=0.4.0.4
     - genvalidity-containers
     - genvalidity-hspec

@@ -1,12 +1,12 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Fixer.Types.Gen where
+module ExchangeRates.Types.Gen where
 
 import TestImport
 
 import Numeric.Natural
 
-import Fixer.Types
+import ExchangeRates.Types
 
 -- Until genvalidity has these.
 instance GenUnchecked Natural where

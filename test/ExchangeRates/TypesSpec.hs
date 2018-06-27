@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
-module Fixer.TypesSpec
+module ExchangeRates.TypesSpec
     ( spec
     ) where
 
@@ -8,9 +8,9 @@ import TestImport
 
 import Data.Ratio
 
-import Fixer.Types
+import ExchangeRates.Types
 
-import Fixer.Types.Gen ()
+import ExchangeRates.Types.Gen ()
 
 spec :: Spec
 spec = do

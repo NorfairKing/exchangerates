@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
-module Fixer.CacheSpec
+module ExchangeRates.CacheSpec
     ( spec
     ) where
 
@@ -10,11 +10,11 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as M
 
-import Fixer.Cache
-import Fixer.Types
+import ExchangeRates.Cache
+import ExchangeRates.Types
 
-import Fixer.Cache.Gen ()
-import Fixer.Types.Gen ()
+import ExchangeRates.Cache.Gen ()
+import ExchangeRates.Types.Gen ()
 
 spec :: Spec
 spec = do
@@ -180,9 +180,9 @@ rateCacheSpec = do
 
 fixerCacheSpec :: Spec
 fixerCacheSpec = do
-    eqSpecOnValid @FixerCache
-    genValidSpec @FixerCache
-    jsonSpecOnValid @FixerCache
+    eqSpecOnValid @ExchangeRatesCache
+    genValidSpec @ExchangeRatesCache
+    jsonSpecOnValid @ExchangeRatesCache
     describe "insertRates" $
         it "produces valid caches" $
         forAllValid $ \d -> producesValidsOnValids3 $ insertRates d

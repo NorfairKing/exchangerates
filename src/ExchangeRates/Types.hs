@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Types for the API
-module Fixer.Types
+module ExchangeRates.Types
     ( Rate(..)
     , oneRate
     , mulRate
