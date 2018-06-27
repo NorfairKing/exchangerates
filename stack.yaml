@@ -1,3 +1,6 @@
 resolver: lts-11.15
 packages:
 - .
+extra-deps:
+- hlint-2.0.15
+- extra-1.6.5

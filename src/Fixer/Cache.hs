@@ -69,14 +69,14 @@ insertRates ::
     -> Rates
     -> FixerCache
     -> FixerCache
-insertRates n d r fc =
-    if ratesDate r == d
-        then let rc' = insertRatesInCache r $ fCacheRates fc
-             in fc {fCacheRates = rc'}
-        else if d >= n
-                 then fc
-                 else let dwr' = S.insert d $ fCacheDaysWithoutRates fc
-                      in fc {fCacheDaysWithoutRates = dwr'}
+insertRates n d r fc
+    | ratesDate r == d =
+        let rc' = insertRatesInCache r $ fCacheRates fc
+         in fc {fCacheRates = rc'}
+    | d >= n = fc
+    | otherwise =
+        let dwr' = S.insert d $ fCacheDaysWithoutRates fc
+         in fc {fCacheDaysWithoutRates = dwr'}
 
 -- | The result of looking up rates in a 'FixerCache'
 data FixerCacheResult
@@ -96,14 +96,13 @@ lookupRates ::
     -> Symbols
     -> FixerCache
     -> FixerCacheResult
-lookupRates n d c s FixerCache {..} =
-    if d >= n
-        then CacheDateNotInPast
-        else if S.member d fCacheDaysWithoutRates
-                 then WillNeverExist
-                 else case lookupRatesInCache d c s fCacheRates of
-                          Nothing -> NotInCache
-                          Just r -> InCache r
+lookupRates n d c s FixerCache {..}
+    | d >= n = CacheDateNotInPast
+    | S.member d fCacheDaysWithoutRates = WillNeverExist
+    | otherwise =
+        case lookupRatesInCache d c s fCacheRates of
+            Nothing -> NotInCache
+            Just r -> InCache r
 
 -- | The empty 'FixerCache'
 emptyFixerCache :: FixerCache
@@ -126,8 +125,8 @@ instance Validity RateCache where
                   go m =
                       not . or $
                       M.mapWithKey (\c m_ -> isJust (M.lookup c m_)) m
-              in all go unRateCache <?@>
-                 "Does not contain conversions to from a currency to itself"
+               in all go unRateCache <?@>
+                  "Does not contain conversions to from a currency to itself"
             ]
     isValid = isValidByValidating
 

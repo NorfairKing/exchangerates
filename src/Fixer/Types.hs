@@ -179,9 +179,9 @@ instance FromJSONKey Currency where
 currencyTextParser :: Text -> JSON.Parser Currency
 currencyTextParser t =
     let s = T.unpack t
-    in case readMaybe s of
-           Nothing -> fail $ "Not a valid currency: " ++ s
-           Just c -> pure c
+     in case readMaybe s of
+            Nothing -> fail $ "Not a valid currency: " ++ s
+            Just c -> pure c
 
 instance ToJSON Currency where
     toJSON = JSON.String . currencyToText

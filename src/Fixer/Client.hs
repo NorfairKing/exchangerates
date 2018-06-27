@@ -118,12 +118,12 @@ withCacheAndRate requestDate mc ms func = do
     let base = fromMaybe defaultBaseCurrency mc
     let symbols = fromMaybe (allSymbolsExcept base) ms
     cacheVar <- asks fEnvCache
-    now <- liftIO $ getCurrentTime
+    now <- liftIO getCurrentTime
     let nowDate = utctDay now
     c <- liftIO $ readTVarIO cacheVar
     case lookupRates nowDate requestDate base symbols c of
         NotInCache -> do
-            rates <- rateLimit $ func
+            rates <- rateLimit func
             liftIO $
                 atomically $
                 modifyTVar' cacheVar (insertRates nowDate requestDate rates)
@@ -139,7 +139,7 @@ withCacheAndRate requestDate mc ms func = do
 
 rateLimit :: ClientM a -> FClient a
 rateLimit func = do
-    now <- liftIO $ getCurrentTime
+    now <- liftIO getCurrentTime
     lastFetchVar <- asks fEnvLastFetch
     mLastFetch <- liftIO $ readTVarIO lastFetchVar
     delayTime <- asks $ confRateDelay . fEnvConfig
@@ -150,9 +150,9 @@ rateLimit func = do
                 Just lastFetch ->
                     let timeSinceLastFetch = diffUTCTime now lastFetch
                         timeSinceLastFetchMicro =
-                            round $
-                            (realToFrac timeSinceLastFetch *
-                             fromIntegral microsecondsPerSecond :: Double)
+                            round
+                                (realToFrac timeSinceLastFetch *
+                                 fromIntegral microsecondsPerSecond :: Double)
                      in delayTime - timeSinceLastFetchMicro
             -- Wait
     liftIO $ threadDelay timeToWait
@@ -186,12 +186,12 @@ readCacheFromFileIfExists fp = do
     mfc <-
         if fe
             then liftIO $ do
-                errOrRes <- Yaml.decodeFileEither fp
-                case errOrRes of
-                    Left e ->
-                        die $
-                        unlines ["Failed to read cache file YAML:", show e]
-                    Right r -> pure r
+                     errOrRes <- Yaml.decodeFileEither fp
+                     case errOrRes of
+                         Left e ->
+                             die $
+                             unlines ["Failed to read cache file YAML:", show e]
+                         Right r -> pure r
             else pure Nothing
     case mfc of
         Nothing -> pure ()

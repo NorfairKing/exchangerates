@@ -10,11 +10,11 @@ import Fixer.Types
 
 -- Until genvalidity has these.
 instance GenUnchecked Natural where
-    genUnchecked = (fromInteger . abs) <$> genValid -- Cannot even generate wrong ones
+    genUnchecked = fromInteger . abs <$> genValid -- Cannot even generate wrong ones
     shrinkUnchecked _ = []
 
 instance GenValid Natural where
-    genValid = (fromInteger . abs) <$> genValid
+    genValid = fromInteger . abs <$> genValid
 
 instance GenUnchecked Rate
 
