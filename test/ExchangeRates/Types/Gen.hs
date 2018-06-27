@@ -1,20 +1,20 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Fixer.Types.Gen where
+module ExchangeRates.Types.Gen where
 
 import TestImport
 
 import Numeric.Natural
 
-import Fixer.Types
+import ExchangeRates.Types
 
 -- Until genvalidity has these.
 instance GenUnchecked Natural where
-    genUnchecked = (fromInteger . abs) <$> genValid -- Cannot even generate wrong ones
+    genUnchecked = fromInteger . abs <$> genValid -- Cannot even generate wrong ones
     shrinkUnchecked _ = []
 
 instance GenValid Natural where
-    genValid = (fromInteger . abs) <$> genValid
+    genValid = fromInteger . abs <$> genValid
 
 instance GenUnchecked Rate
 

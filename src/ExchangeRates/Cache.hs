@@ -4,12 +4,12 @@
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Caches for the raw API
-module Fixer.Cache
-    ( FixerCache(..)
+module ExchangeRates.Cache
+    ( ExchangeRatesCache(..)
     , insertRates
-    , FixerCacheResult(..)
+    , ExchangeRatesCacheResult(..)
     , lookupRates
-    , emptyFixerCache
+    , emptyExchangeRatesCache
     , RateCache(..)
     , emptyRateCache
     , insertRatesInCache
@@ -37,56 +37,56 @@ import Data.Time
 import Data.Validity
 import GHC.Generics (Generic)
 
-import Fixer.Types
+import ExchangeRates.Types
 
 -- | A complete cache for the raw API.
 --
 -- This includes a cache for the rates we get, as well as a cache for the
 -- rates we do not get.
-data FixerCache = FixerCache
+data ExchangeRatesCache = ExchangeRatesCache
     { fCacheRates :: RateCache
     , fCacheDaysWithoutRates :: Set Day
     } deriving (Show, Eq, Generic)
 
-instance Validity FixerCache
+instance Validity ExchangeRatesCache
 
-instance FromJSON FixerCache where
+instance FromJSON ExchangeRatesCache where
     parseJSON =
-        withObject "FixerCache" $ \o ->
-            FixerCache <$> o .: "rates" <*> o .: "days-without-rates"
+        withObject "ExchangeRatesCache" $ \o ->
+            ExchangeRatesCache <$> o .: "rates" <*> o .: "days-without-rates"
 
-instance ToJSON FixerCache where
-    toJSON FixerCache {..} =
+instance ToJSON ExchangeRatesCache where
+    toJSON ExchangeRatesCache {..} =
         object
             [ "rates" .= fCacheRates
             , "days-without-rates" .= fCacheDaysWithoutRates
             ]
 
--- | Insert a given raw response in a 'FixerCache'
+-- | Insert a given raw response in a 'ExchangeRatesCache'
 insertRates ::
        Day -- ^ The current date
     -> Day -- ^ The requested date
     -> Rates
-    -> FixerCache
-    -> FixerCache
-insertRates n d r fc =
-    if ratesDate r == d
-        then let rc' = insertRatesInCache r $ fCacheRates fc
-             in fc {fCacheRates = rc'}
-        else if d >= n
-                 then fc
-                 else let dwr' = S.insert d $ fCacheDaysWithoutRates fc
-                      in fc {fCacheDaysWithoutRates = dwr'}
+    -> ExchangeRatesCache
+    -> ExchangeRatesCache
+insertRates n d r fc
+    | ratesDate r == d =
+        let rc' = insertRatesInCache r $ fCacheRates fc
+         in fc {fCacheRates = rc'}
+    | d >= n = fc
+    | otherwise =
+        let dwr' = S.insert d $ fCacheDaysWithoutRates fc
+         in fc {fCacheDaysWithoutRates = dwr'}
 
--- | The result of looking up rates in a 'FixerCache'
-data FixerCacheResult
+-- | The result of looking up rates in a 'ExchangeRatesCache'
+data ExchangeRatesCacheResult
     = NotInCache
     | CacheDateNotInPast -- ^ Because we requested a date in the future
     | WillNeverExist -- ^ Because it was on a weekend or holiday
     | InCache Rates
     deriving (Show, Eq, Generic)
 
-instance Validity FixerCacheResult
+instance Validity ExchangeRatesCacheResult
 
 -- | Look up rates in cache
 lookupRates ::
@@ -94,21 +94,21 @@ lookupRates ::
     -> Day -- ^ The requested date
     -> Currency
     -> Symbols
-    -> FixerCache
-    -> FixerCacheResult
-lookupRates n d c s FixerCache {..} =
-    if d >= n
-        then CacheDateNotInPast
-        else if S.member d fCacheDaysWithoutRates
-                 then WillNeverExist
-                 else case lookupRatesInCache d c s fCacheRates of
-                          Nothing -> NotInCache
-                          Just r -> InCache r
+    -> ExchangeRatesCache
+    -> ExchangeRatesCacheResult
+lookupRates n d c s ExchangeRatesCache {..}
+    | d >= n = CacheDateNotInPast
+    | S.member d fCacheDaysWithoutRates = WillNeverExist
+    | otherwise =
+        case lookupRatesInCache d c s fCacheRates of
+            Nothing -> NotInCache
+            Just r -> InCache r
 
--- | The empty 'FixerCache'
-emptyFixerCache :: FixerCache
-emptyFixerCache =
-    FixerCache {fCacheRates = emptyRateCache, fCacheDaysWithoutRates = S.empty}
+-- | The empty 'ExchangeRatesCache'
+emptyExchangeRatesCache :: ExchangeRatesCache
+emptyExchangeRatesCache =
+    ExchangeRatesCache
+        {fCacheRates = emptyRateCache, fCacheDaysWithoutRates = S.empty}
 
 -- | A cache for currency rates
 --
@@ -126,8 +126,8 @@ instance Validity RateCache where
                   go m =
                       not . or $
                       M.mapWithKey (\c m_ -> isJust (M.lookup c m_)) m
-              in all go unRateCache <?@>
-                 "Does not contain conversions to from a currency to itself"
+               in all go unRateCache <?@>
+                  "Does not contain conversions to from a currency to itself"
             ]
     isValid = isValidByValidating
 

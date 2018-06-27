@@ -1,9 +1,9 @@
--- | The top-level API for the Haskell Fixer client.
+-- | The top-level API for the Haskell ExchangeRates client.
 --
 -- There is an example usage in the 'README' file.
-module Fixer
+module ExchangeRates
     ( FClient
-    , autoRunFixerClient
+    , autoRunExchangeRatesClient
     , RatesResult(..)
     , getLatest
     , getAtDate
@@ -28,5 +28,5 @@ module Fixer
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Time
 
-import Fixer.Client
-import Fixer.Types
+import ExchangeRates.Client
+import ExchangeRates.Types

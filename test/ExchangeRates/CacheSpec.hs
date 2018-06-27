@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
-module Fixer.CacheSpec
+module ExchangeRates.CacheSpec
     ( spec
     ) where
 
@@ -10,11 +10,11 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as M
 
-import Fixer.Cache
-import Fixer.Types
+import ExchangeRates.Cache
+import ExchangeRates.Types
 
-import Fixer.Cache.Gen ()
-import Fixer.Types.Gen ()
+import ExchangeRates.Cache.Gen ()
+import ExchangeRates.Types.Gen ()
 
 spec :: Spec
 spec = do
@@ -43,8 +43,8 @@ rateCacheSpec = do
                         forAllValid $ \r ->
                             forAllValid $ \fc ->
                                 let fc' = rawInsertInCache d c1 c2 r fc
-                                in rawLookupInCache d c1 c2 fc' `shouldBe`
-                                   Just r
+                                 in rawLookupInCache d c1 c2 fc' `shouldBe`
+                                    Just r
     describe "defaultBaseCurrency" $
         it "is valid" $ shouldBeValid defaultBaseCurrency
     describe "allSymbols" $
@@ -99,62 +99,65 @@ rateCacheSpec = do
                         forAllValid $ \rate ->
                             let cache =
                                     RateCache
-                                    { unRateCache =
-                                          M.fromList
-                                              [ ( date
-                                                , M.fromList
-                                                      [ ( base
-                                                        , M.fromList
-                                                              [(symbol, rate)])
-                                                      ])
-                                              ]
-                                    }
+                                        { unRateCache =
+                                              M.fromList
+                                                  [ ( date
+                                                    , M.fromList
+                                                          [ ( base
+                                                            , M.fromList
+                                                                  [ ( symbol
+                                                                    , rate)
+                                                                  ])
+                                                          ])
+                                                  ]
+                                        }
                                 rates =
                                     Rates
-                                    { ratesBase = base
-                                    , ratesDate = date
-                                    , ratesRates = M.fromList [(symbol, rate)]
-                                    }
-                            in lookupRatesInCache
-                                   date
-                                   base
-                                   (Symbols $ symbol :| [])
-                                   cache `shouldBe`
-                               Just rates
+                                        { ratesBase = base
+                                        , ratesDate = date
+                                        , ratesRates =
+                                              M.fromList [(symbol, rate)]
+                                        }
+                             in lookupRatesInCache
+                                    date
+                                    base
+                                    (Symbols $ symbol :| [])
+                                    cache `shouldBe`
+                                Just rates
         it
             "finds the rates that were just added with insertRatesInCache when adding at the default base currency" $
             forAllValid $ \rates' ->
                 forAllValid $ \fc ->
                     let rates =
                             rates'
-                            { ratesBase = defaultBaseCurrency
-                            , ratesRates =
-                                  M.delete defaultBaseCurrency $
-                                  ratesRates rates'
-                            }
+                                { ratesBase = defaultBaseCurrency
+                                , ratesRates =
+                                      M.delete defaultBaseCurrency $
+                                      ratesRates rates'
+                                }
                         fc' = insertRatesInCache rates fc
-                    in case NE.nonEmpty (M.keys $ ratesRates rates) of
-                           Nothing -> pure () -- Fine
-                           Just symbols ->
-                               lookupRatesInCache
-                                   (ratesDate rates)
-                                   (ratesBase rates)
-                                   (Symbols symbols)
-                                   fc' `shouldBe`
-                               Just rates
+                     in case NE.nonEmpty (M.keys $ ratesRates rates) of
+                            Nothing -> pure () -- Fine
+                            Just symbols ->
+                                lookupRatesInCache
+                                    (ratesDate rates)
+                                    (ratesBase rates)
+                                    (Symbols symbols)
+                                    fc' `shouldBe`
+                                Just rates
         it "finds the rates that were just added with insertRatesInCache" $
             forAllValid $ \rates ->
                 forAllValid $ \fc ->
                     let fc' = insertRatesInCache rates fc
-                    in case NE.nonEmpty (M.keys $ ratesRates rates) of
-                           Nothing -> pure () -- Fine
-                           Just symbols ->
-                               lookupRatesInCache
-                                   (ratesDate rates)
-                                   (ratesBase rates)
-                                   (Symbols symbols)
-                                   fc' `shouldBe`
-                               Just rates
+                     in case NE.nonEmpty (M.keys $ ratesRates rates) of
+                            Nothing -> pure () -- Fine
+                            Just symbols ->
+                                lookupRatesInCache
+                                    (ratesDate rates)
+                                    (ratesBase rates)
+                                    (Symbols symbols)
+                                    fc' `shouldBe`
+                                Just rates
     describe "convertToBaseWithRate" $ do
         it "produces valid caches" $
             forAllValid $ \base ->
@@ -168,22 +171,22 @@ rateCacheSpec = do
                         unless (base == ratesBase rates) $
                         let rates' =
                                 rates
-                                { ratesRates =
-                                      M.insert base rate $ ratesRates rates
-                                }
+                                    { ratesRates =
+                                          M.insert base rate $ ratesRates rates
+                                    }
                             rates'' = convertToBaseWithRate base rate rates'
-                        in M.lookup (ratesBase rates) (ratesRates rates'') `shouldBe`
-                           Just (divRate oneRate rate)
+                         in M.lookup (ratesBase rates) (ratesRates rates'') `shouldBe`
+                            Just (divRate oneRate rate)
 
 fixerCacheSpec :: Spec
 fixerCacheSpec = do
-    eqSpecOnValid @FixerCache
-    genValidSpec @FixerCache
-    jsonSpecOnValid @FixerCache
+    eqSpecOnValid @ExchangeRatesCache
+    genValidSpec @ExchangeRatesCache
+    jsonSpecOnValid @ExchangeRatesCache
     describe "insertRates" $
-        it "produces valid caches" $ producesValidsOnValids3 insertRates
+        it "produces valid caches" $
+        forAllValid $ \d -> producesValidsOnValids3 $ insertRates d
     describe "lookupRates" $
         it "produces valid results" $
         forAllValid $ \dn ->
-         forAllValid $ \dr ->
-                producesValidsOnValids3 $ lookupRates dn dr
+            forAllValid $ \dr -> producesValidsOnValids3 $ lookupRates dn dr

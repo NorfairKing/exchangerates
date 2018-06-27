@@ -2,10 +2,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 -- | The transparently caching client
-module Fixer.Client
-    ( autoRunFixerClient
+module ExchangeRates.Client
+    ( autoRunExchangeRatesClient
     , defaultConfig
-    , runFixerClient
+    , runExchangeRatesClient
     , FClient
     , getLatest
     , getAtDate
@@ -23,13 +23,15 @@ import Data.Time
 import Data.Validity
 import qualified Data.Yaml as Yaml
 import GHC.Generics
-import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Network.HTTP.Client (newManager)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Servant.Client
 import System.Directory (doesFileExist)
+import System.Exit (die)
 
-import qualified Fixer.API as Raw
-import Fixer.Cache
-import Fixer.Types
+import qualified ExchangeRates.API as Raw
+import ExchangeRates.Cache
+import ExchangeRates.Types
 
 -- | A client function
 newtype FClient a = FClient
@@ -39,45 +41,47 @@ newtype FClient a = FClient
 data FEnv = FEnv
     { fEnvConfig :: Config
     , fEnvLastFetch :: TVar (Maybe UTCTime)
-    , fEnvCache :: TVar FixerCache
+    , fEnvCache :: TVar ExchangeRatesCache
     } deriving (Generic)
 
 newtype Config = Config
     { confRateDelay :: Int -- ^ Microseconds
     } deriving (Show, Eq, Generic)
 
--- | Run a 'FClient' action and figure out the 'ClientEnv' and 'FixerCache'
+-- | Run a 'FClient' action and figure out the 'ClientEnv' and 'ExchangeRatesCache'
 -- arguments automatically.
 --
 -- This is probably the function you want to use
-autoRunFixerClient :: FClient a -> IO (Either ServantError a)
-autoRunFixerClient func = do
-    man <- newManager defaultManagerSettings
-    burl <- parseBaseUrl "http://api.fixer.io/"
+autoRunExchangeRatesClient :: FClient a -> IO (Either ServantError a)
+autoRunExchangeRatesClient func = do
+    man <- newManager tlsManagerSettings
+    burl <- parseBaseUrl "https://exchangeratesapi.io/api"
     env <- makeEnv
-    runFixerClient env (ClientEnv man burl) func
+    runExchangeRatesClient env (ClientEnv man burl Nothing) func
 
 makeEnv :: IO FEnv
 makeEnv = do
     lastFetchVar <- newTVarIO Nothing
-    cacheVar <- newTVarIO emptyFixerCache
+    cacheVar <- newTVarIO emptyExchangeRatesCache
     pure
         FEnv
-        { fEnvConfig = defaultConfig
-        , fEnvLastFetch = lastFetchVar
-        , fEnvCache = cacheVar
-        }
+            { fEnvConfig = defaultConfig
+            , fEnvLastFetch = lastFetchVar
+            , fEnvCache = cacheVar
+            }
 
 -- | A default configuration for the client: One second of delay between calls
 defaultConfig :: Config
 defaultConfig =
     Config
-    { confRateDelay = 1 * microsecondsPerSecond -- One second
-    }
+        { confRateDelay = 1 * microsecondsPerSecond -- One second
+        }
 
 -- | Run a 'FClient' action with full control over the inputs.
-runFixerClient :: FEnv -> ClientEnv -> FClient a -> IO (Either ServantError a)
-runFixerClient env ce func = runClientM (runReaderT (runFClient func) env) ce
+runExchangeRatesClient ::
+       FEnv -> ClientEnv -> FClient a -> IO (Either ServantError a)
+runExchangeRatesClient env ce func =
+    runClientM (runReaderT (runFClient func) env) ce
 
 -- | Get the latest rates.
 --
@@ -117,12 +121,12 @@ withCacheAndRate requestDate mc ms func = do
     let base = fromMaybe defaultBaseCurrency mc
     let symbols = fromMaybe (allSymbolsExcept base) ms
     cacheVar <- asks fEnvCache
-    now <- liftIO $ getCurrentTime
+    now <- liftIO getCurrentTime
     let nowDate = utctDay now
     c <- liftIO $ readTVarIO cacheVar
     case lookupRates nowDate requestDate base symbols c of
         NotInCache -> do
-            rates <- rateLimit $ func
+            rates <- rateLimit func
             liftIO $
                 atomically $
                 modifyTVar' cacheVar (insertRates nowDate requestDate rates)
@@ -138,7 +142,7 @@ withCacheAndRate requestDate mc ms func = do
 
 rateLimit :: ClientM a -> FClient a
 rateLimit func = do
-    now <- liftIO $ getCurrentTime
+    now <- liftIO getCurrentTime
     lastFetchVar <- asks fEnvLastFetch
     mLastFetch <- liftIO $ readTVarIO lastFetchVar
     delayTime <- asks $ confRateDelay . fEnvConfig
@@ -149,10 +153,10 @@ rateLimit func = do
                 Just lastFetch ->
                     let timeSinceLastFetch = diffUTCTime now lastFetch
                         timeSinceLastFetchMicro =
-                            round $
-                            (realToFrac timeSinceLastFetch *
-                             fromIntegral microsecondsPerSecond :: Double)
-                    in delayTime - timeSinceLastFetchMicro
+                            round
+                                (realToFrac timeSinceLastFetch *
+                                 fromIntegral microsecondsPerSecond :: Double)
+                     in delayTime - timeSinceLastFetchMicro
             -- Wait
     liftIO $ threadDelay timeToWait
             -- Make the request
@@ -184,7 +188,13 @@ readCacheFromFileIfExists fp = do
     fe <- liftIO $ doesFileExist fp
     mfc <-
         if fe
-            then liftIO $ Yaml.decodeFile fp
+            then liftIO $ do
+                     errOrRes <- Yaml.decodeFileEither fp
+                     case errOrRes of
+                         Left e ->
+                             die $
+                             unlines ["Failed to read cache file YAML:", show e]
+                         Right r -> pure r
             else pure Nothing
     case mfc of
         Nothing -> pure ()
