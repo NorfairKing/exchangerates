@@ -16,7 +16,7 @@ main :: IO
 main = do
     rates <-
         autoRunExchangeRatesClient $
-          withFileCache "/tmp/fixer.cache" $
+          withFileCache "/tmp/exchangerates.cache" $
             getAtDate (fromGregorian 2018 01 19) (Just EUR) Nothing
     case rates of
         Left err -> die $ show err

@@ -8,7 +8,6 @@ copyright:           "Copyright: (c) 2018 Tom Sydney Kerckhove"
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 
 synopsis:            A Haskell client for https://exchangeratesapi.io/
 category:            API

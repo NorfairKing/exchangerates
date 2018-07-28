@@ -101,7 +101,7 @@ instance FromJSON Rate where
 instance ToJSON Rate where
     toJSON = toJSON . unRate
 
--- | A sum-type of the supported currencies on fixer.io
+-- | A sum-type of the supported currencies on exchangeratesapi.io
 data Currency
     = AUD
     | BGN
@@ -152,7 +152,7 @@ instance Validity Symbols
 instance ToHttpApiData Symbols where
     toUrlPiece = T.intercalate "," . map toUrlPiece . NE.toList . unSymbols
 
--- | The raw response of fixer.io
+-- | The raw response of exchangeratesapi.io
 data Rates = Rates
     { ratesBase :: Currency
     , ratesDate :: Day

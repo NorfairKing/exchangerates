@@ -4,9 +4,9 @@
 -- | The raw API
 module ExchangeRates.API
     ( ExchangeRatesAPI
+    , exchangeRatesAPI
     , GetLatest
     , GetAtDate
-    , fixerAPI
     , getLatest
     , getAtDate
     ) where
@@ -19,10 +19,10 @@ import Servant.Client
 import ExchangeRates.Types
 
 -- | A 'Proxy' for 'ExchangeRatesAPI'
-fixerAPI :: Proxy ExchangeRatesAPI
-fixerAPI = Proxy
+exchangeRatesAPI :: Proxy ExchangeRatesAPI
+exchangeRatesAPI = Proxy
 
--- | The full API at api.fixer.io
+-- | The full API at api.exchangeratesapi.io
 type ExchangeRatesAPI = GetLatest :<|> GetAtDate
 
 -- | Get latest rates
@@ -41,4 +41,4 @@ type GetAtDate
 getLatest :: Maybe Currency -> Maybe Symbols -> ClientM Rates
 -- | The client function for 'GetAtDate'
 getAtDate :: Day -> Maybe Currency -> Maybe Symbols -> ClientM Rates
-getLatest :<|> getAtDate = client fixerAPI
+getLatest :<|> getAtDate = client exchangeRatesAPI

@@ -19,7 +19,7 @@ import ExchangeRates.Types.Gen ()
 spec :: Spec
 spec = do
     rateCacheSpec
-    fixerCacheSpec
+    exchangeRatesCacheSpec
 
 rateCacheSpec :: Spec
 rateCacheSpec = do
@@ -178,8 +178,8 @@ rateCacheSpec = do
                          in M.lookup (ratesBase rates) (ratesRates rates'') `shouldBe`
                             Just (divRate oneRate rate)
 
-fixerCacheSpec :: Spec
-fixerCacheSpec = do
+exchangeRatesCacheSpec :: Spec
+exchangeRatesCacheSpec = do
     eqSpecOnValid @ExchangeRatesCache
     genValidSpec @ExchangeRatesCache
     jsonSpecOnValid @ExchangeRatesCache
